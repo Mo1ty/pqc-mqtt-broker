@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9f4b03be-9aba-40a8-9ef3-ec8691befe8c" name="Default Changelist" comment="" />
+    <list default="true" id="9f4b03be-9aba-40a8-9ef3-ec8691befe8c" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/mo1ty/mqttbroker/MqttBroker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/mo1ty/mqttbroker/MqttBroker.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/mo1ty/mqttbroker/entity/MessageStruct.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/mo1ty/mqttbroker/entity/MessageStruct.java" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -41,6 +45,7 @@
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\Mo1ty\IdeaProjects\MqttBroker" />
       <recent name="C:\Users\Mo1ty\IdeaProjects\MqttBroker\src\main\java\com\mo1ty\mqttbroker\entity" />
     </key>
   </component>
@@ -53,6 +58,18 @@
       <option name="presentableId" value="Default" />
       <updated>1714927767125</updated>
     </task>
+    <task id="LOCAL-00001" summary="Initial commit">
+      <created>1715000897631</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1715000897631</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Initial commit" />
+    <option name="LAST_COMMIT_MESSAGE" value="Initial commit" />
   </component>
 </project>

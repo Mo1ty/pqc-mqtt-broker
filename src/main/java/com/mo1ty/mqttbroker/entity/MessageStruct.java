@@ -1,5 +1,8 @@
 package com.mo1ty.mqttbroker.entity;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -36,6 +39,11 @@ public class MessageStruct implements Serializable {
 
     public byte[] getBytes(){
         return this.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    public static MessageStruct getFromBytes(byte[] message) throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.reader().readValue(message, MessageStruct.class);
     }
 
 }

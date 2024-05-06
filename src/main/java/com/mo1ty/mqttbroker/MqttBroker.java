@@ -12,11 +12,16 @@ import com.hivemq.extension.sdk.api.packets.publish.AckReasonCode;
 import com.hivemq.extension.sdk.api.packets.publish.PublishPacket;
 import com.hivemq.util.Bytes;
 import com.mo1ty.mqttbroker.crypto.CertVerify;
+import com.mo1ty.mqttbroker.crypto.KyberBroker;
+import com.mo1ty.mqttbroker.entity.EncryptedPayload;
 import com.mo1ty.mqttbroker.entity.MqttMsgPayload;
 import com.mo1ty.mqttbroker.entity.MessageStruct;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -26,10 +31,12 @@ import java.util.HashMap;
 public class MqttBroker {
 
     public static void main(String[] args){
+        KyberBroker kyberBroker = new KyberBroker();
+
         EmbeddedHiveMQBuilder hiveMqBuilder = new EmbeddedHiveMQBuilderImpl();
 
         HashMap<String, X509Certificate> certificateHashMap = new HashMap<>();
-        HashMap<String, PrivateKey> privateKeyHashMap = new HashMap<>();
+        HashMap<String, KeyPair> privateKeyHashMap = new HashMap<>();
 
         PublishInboundInterceptor publishInboundInterceptor = new PublishInboundInterceptor() {
             @Override
@@ -59,15 +66,33 @@ public class MqttBroker {
                         String responseTopic = publishPacket.getResponseTopic()
                                 .orElse(msgPayload.messageStruct.mqttTopic);
                         String deviceName = publishPacket.getUserProperties().getAllForName("DEVICE_IDENTIFIER").get(0);
+                        KeyPair keyPair = kyberBroker.generateKeys();
+                        privateKeyHashMap.put(deviceName, keyPair);
 
-
-
-
+                        publishInboundOutput.getPublishPacket().setPayload(
+                                ByteBuffer.wrap(keyPair.getPrivate().getEncoded())
+                        );
+                        publishInboundOutput.getPublishPacket().setTopic(responseTopic);
+                        return;
+                    }
+                }
+                catch (Exception e){
+                    e.printStackTrace();
+                }
+                EncryptedPayload encryptedPayload = isEncryptedPayload(payload);
+                try{
+                    if(encryptedPayload != null){
                         // IF IT IS AN ENCRYPTED PAYLOAD ENTITY, DECYPHER IT,
                         // GENERATE NEW KYBER KEYS OR USE EXISTING IF WIRED TO
                         // INDIVIDUAL CONNECTIONS
 
-
+                        String deviceName = publishPacket.getUserProperties().getAllForName("DEVICE_IDENTIFIER").get(0);
+                        String encryptedMessage = encryptedPayload.encryptedMessage;
+                        byte[] plainMessage = kyberBroker.decrypt(
+                                privateKeyHashMap.get(deviceName).getPrivate(),
+                                encryptedMessage.getBytes(StandardCharsets.UTF_8)
+                        );
+                        MessageStruct messageStruct = MessageStruct.getFromBytes(plainMessage);
                     }
                 }
                 catch (Exception e){
@@ -84,6 +109,15 @@ public class MqttBroker {
     private static MqttMsgPayload isCertPayload(byte[] payload){
         try{
             return MqttMsgPayload.getFromJsonString(payload);
+        }
+        catch (Exception e){
+            return null;
+        }
+    }
+
+    private static EncryptedPayload isEncryptedPayload(byte[] payload){
+        try{
+            return EncryptedPayload.getFromJsonString(payload);
         }
         catch (Exception e){
             return null;
