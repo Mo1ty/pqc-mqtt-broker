@@ -26,4 +26,10 @@ public class KyberBroker {
         return encryptionCipher.doFinal(payload);
     }
 
+    public byte[] encrypt(PublicKey publicKey, byte[] payload) throws Exception {
+        Cipher encryptionCipher = Cipher.getInstance("Kyber-1024", "BC");
+        encryptionCipher.init(Cipher.ENCRYPT_MODE, publicKey);
+        return encryptionCipher.doFinal(payload);
+    }
+
 }

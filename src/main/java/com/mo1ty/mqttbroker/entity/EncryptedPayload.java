@@ -16,4 +16,28 @@ public class EncryptedPayload {
         ObjectMapper objectMapper = new ObjectMapper();
         return objectMapper.reader().readValue(jsonString, EncryptedPayload.class);
     }
+
+    public EncryptedPayload(String encryptedMessage, String algorithmIdentifier) {
+        this.encryptedMessage = encryptedMessage;
+        this.algorithmIdentifier = algorithmIdentifier;
+    }
+
+    public EncryptedPayload() {
+    }
+
+    public String getEncryptedMessage() {
+        return encryptedMessage;
+    }
+
+    public void setEncryptedMessage(String encryptedMessage) {
+        this.encryptedMessage = encryptedMessage;
+    }
+
+    public String getAlgorithmIdentifier() {
+        return algorithmIdentifier;
+    }
+
+    public void setAlgorithmIdentifier(String algorithmIdentifier) {
+        this.algorithmIdentifier = algorithmIdentifier;
+    }
 }
