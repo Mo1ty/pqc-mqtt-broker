@@ -45,12 +45,6 @@ import java.util.concurrent.CompletableFuture;
 
 public class MqttBroker {
 
-    private static HashMap<String, X509Certificate> certificateHashMap = new HashMap<>();
-    private static HashMap<String, KeyPair> privateKeyHashMap = new HashMap<>();
-    private static HashMap<String, PublicKey> publicKeyHashMap = new HashMap<>();
-    private static final CertVerify certVerify = new CertVerify();
-    private static final KyberBroker kyberBroker = new KyberBroker();
-
     public static void main(String[] args){
 
         EmbeddedExtensionBuilder extensionBuilder = new EmbeddedExtensionBuilderImpl();
@@ -67,8 +61,6 @@ public class MqttBroker {
                 );
 
         EmbeddedHiveMQ hiveMQ = hiveMqBuilder.build();
-
-
 
         CompletableFuture<Void> completableFuture = hiveMQ.start();
     }

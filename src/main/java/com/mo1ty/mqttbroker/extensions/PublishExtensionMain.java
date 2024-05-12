@@ -24,6 +24,7 @@ import com.mo1ty.mqttbroker.crypto.CertVerify;
 import com.mo1ty.mqttbroker.crypto.KyberBroker;
 import com.mo1ty.mqttbroker.entity.EncryptedPayload;
 import com.mo1ty.mqttbroker.entity.MqttMsgPayload;
+import org.bouncycastle.util.encoders.Base64;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -33,6 +34,7 @@ import java.security.KeyPair;
 import java.security.PublicKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.HashMap;
 
 public class PublishExtensionMain implements ExtensionMain {
@@ -90,8 +92,11 @@ public class PublishExtensionMain implements ExtensionMain {
                     CertificateFactory cf = CertificateFactory.getInstance("X.509");
                     InputStream in = new ByteArrayInputStream(msgPayload.x509Certificate);
                     X509Certificate cert = (X509Certificate) cf.generateCertificate(in);
-                    if(!certVerify.verifyHashedMessage(cert.getPublicKey(), msgPayload.messageStruct.getBytes(), msgPayload.signature))
-                        publishInboundOutput.preventPublishDelivery(AckReasonCode.PAYLOAD_FORMAT_INVALID);
+
+                    if(!certVerify.verifyHashedMessage(cert.getPublicKey(), msgPayload.messageStruct.toJsonStringAsBytes(), msgPayload.signature)) {
+                        publishInboundOutput.preventPublishDelivery(AckReasonCode.UNSPECIFIED_ERROR);
+                        return;
+                    }
                     else if(!msgPayload.messageStruct.plainMessage.contains("INIT_CONN_2"))
                         return;
 
@@ -108,6 +113,7 @@ public class PublishExtensionMain implements ExtensionMain {
                             ByteBuffer.wrap(keyPair.getPrivate().getEncoded())
                     );
                     publishInboundOutput.getPublishPacket().setTopic(responseTopic);
+                    System.out.println("PACKET DELIVERED AND SAVED!");
                     return;
                 }
             }
@@ -130,7 +136,7 @@ public class PublishExtensionMain implements ExtensionMain {
                             encryptedMessage.getBytes(StandardCharsets.UTF_8)
                     );
                     MqttMsgPayload mqttMsgPayload = MqttMsgPayload.getFromJsonString(plainMessage);
-
+                    return;
                 }
             }
             catch (Exception e){
@@ -139,8 +145,9 @@ public class PublishExtensionMain implements ExtensionMain {
 
             // IF THIS MESSAGE IS NONE OF THESE, MESSAGE IS NOT DELIVERED
             publishInboundOutput.preventPublishDelivery(
-                    AckReasonCode.PAYLOAD_FORMAT_INVALID
+                    AckReasonCode.UNSPECIFIED_ERROR
             );
+            System.out.println("PACKET NOT DELIVERED!");
         }
     }
 

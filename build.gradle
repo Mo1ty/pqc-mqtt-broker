@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'application'
 }
 
 group 'com.mo1ty'
@@ -27,6 +28,25 @@ dependencies {
 
 }
 
-test {
+mainClassName = 'com/mo1ty/mqttbroker/MqttBroker'
+
+task mqttBroker(type: Jar) {
+    doFirst {
+        from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    }
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF','META-INF/*.DSA'
+    manifest {
+        attributes 'Main-Class': "${mainClassName}"
+    }
+    archiveBaseName = "${rootProject.name}"
+    tasks.withType(Jar){
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    from { configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+
+tasks.test {
     useJUnitPlatform()
 }

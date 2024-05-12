@@ -1,8 +1,10 @@
 package com.mo1ty.mqttbroker.entity;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hivemq.util.Bytes;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 public class MqttMsgPayload implements Serializable {
@@ -18,6 +20,7 @@ public class MqttMsgPayload implements Serializable {
 
     public static MqttMsgPayload getFromJsonString(byte[] jsonString) throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.reader().readValue(jsonString, MqttMsgPayload.class);
+        String jsonStr = new String(jsonString, StandardCharsets.UTF_8);
+        return objectMapper.reader().readValue(jsonStr, MqttMsgPayload.class);
     }
 }

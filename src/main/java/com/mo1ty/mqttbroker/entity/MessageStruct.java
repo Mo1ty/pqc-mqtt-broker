@@ -30,6 +30,7 @@ public class MessageStruct implements Serializable {
 
     @Override
     public String toString() {
+        System.out.println("STRING INITIATED!");
         return "MessageStruct{" +
                 "plainMessage='" + plainMessage +
                 ", timestamp=" + timestamp +
@@ -37,8 +38,10 @@ public class MessageStruct implements Serializable {
                 "}";
     }
 
-    public byte[] getBytes(){
-        return this.toString().getBytes(StandardCharsets.UTF_8);
+    public byte[] toJsonStringAsBytes() throws Exception {
+        System.out.println("JACKSON STRING INITIATED!");
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.writer().writeValueAsString(this).getBytes(StandardCharsets.UTF_8);
     }
 
     public static MessageStruct getFromBytes(byte[] message) throws IOException {
