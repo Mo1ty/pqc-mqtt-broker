@@ -20,22 +20,27 @@ import com.hivemq.extension.sdk.api.services.Services;
 import com.hivemq.extension.sdk.api.services.intializer.ClientInitializer;
 import com.hivemq.extension.sdk.api.services.intializer.InitializerRegistry;
 import com.hivemq.util.Bytes;
+import com.mo1ty.mqttbroker.crypto.AesUtil;
 import com.mo1ty.mqttbroker.crypto.CertVerify;
 import com.mo1ty.mqttbroker.crypto.KyberBroker;
 import com.mo1ty.mqttbroker.entity.EncryptedPayload;
+import com.mo1ty.mqttbroker.entity.MessageStruct;
 import com.mo1ty.mqttbroker.entity.MqttMsgPayload;
 import org.bouncycastle.util.encoders.Base64;
 
+import javax.crypto.SecretKey;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.security.KeyPair;
 import java.security.PublicKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 public class PublishExtensionMain implements ExtensionMain {
 
@@ -44,6 +49,9 @@ public class PublishExtensionMain implements ExtensionMain {
     private HashMap<String, PublicKey> publicKeyHashMap = new HashMap<>();
     private final CertVerify certVerify = new CertVerify();
     private final KyberBroker kyberBroker = new KyberBroker();
+    private final AesUtil aesUtil = new AesUtil();
+
+    private HashMap<String, SecretKey> secretKeyHashMap = new HashMap<>();
 
     @Override
     public void extensionStart(ExtensionStartInput input, ExtensionStartOutput output) {
@@ -81,7 +89,7 @@ public class PublishExtensionMain implements ExtensionMain {
         public void onInboundPublish(@NotNull PublishInboundInput publishInboundInput, @NotNull PublishInboundOutput publishInboundOutput) {
             PublishPacket publishPacket = publishInboundInput.getPublishPacket();
             byte[] payload = Bytes.getBytesFromReadOnlyBuffer(publishPacket.getPayload());
-            String clientId = publishInboundInput.getClientInformation().getClientId();
+            String deviceName = publishInboundInput.getClientInformation().getClientId();
 
             MqttMsgPayload msgPayload = isCertPayload(payload);
             try{
@@ -106,13 +114,15 @@ public class PublishExtensionMain implements ExtensionMain {
                     String responseTopic = publishPacket.getResponseTopic()
                             .orElse(msgPayload.messageStruct.mqttTopic);
                     KeyPair keyPair = kyberBroker.generateKeys();
-                    certificateHashMap.put(clientId, cert);
-                    privateKeyHashMap.put(clientId, keyPair);
+                    certificateHashMap.put(deviceName, cert);
+                    privateKeyHashMap.put(deviceName, keyPair);
 
                     publishInboundOutput.getPublishPacket().setPayload(
-                            ByteBuffer.wrap(keyPair.getPrivate().getEncoded())
+                            ByteBuffer.wrap(keyPair.getPublic().getEncoded())
                     );
                     publishInboundOutput.getPublishPacket().setTopic(responseTopic);
+                    publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("is_request_response", "true");
+                    publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("requires_encryption", "false");
                     System.out.println("PACKET DELIVERED AND SAVED!");
                     return;
                 }
@@ -121,21 +131,64 @@ public class PublishExtensionMain implements ExtensionMain {
                 e.printStackTrace();
             }
 
-            //
             EncryptedPayload encryptedPayload = isEncryptedPayload(payload);
             try{
                 if(encryptedPayload != null){
-                    // IF IT IS AN ENCRYPTED PAYLOAD ENTITY, DECRYPT IT,
-                    // GENERATE NEW KYBER KEYS OR USE EXISTING IF WIRED TO
-                    // INDIVIDUAL CONNECTIONS
+                    // Validate payload using certificate
+                    CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                    InputStream in = new ByteArrayInputStream(encryptedPayload.x509Certificate);
+                    X509Certificate encryptedCert = (X509Certificate) cf.generateCertificate(in);
 
-                    String deviceName = publishPacket.getUserProperties().getAllForName("DEVICE_IDENTIFIER").get(0);
-                    String encryptedMessage = encryptedPayload.encryptedMessage;
-                    byte[] plainMessage = kyberBroker.decrypt(
-                            privateKeyHashMap.get(deviceName).getPrivate(),
-                            encryptedMessage.getBytes(StandardCharsets.UTF_8)
+                    boolean isSignatureValid = !encryptedPayload.algorithmIdentifier.contains("AES")
+                            ? certVerify.verifyHashedMessage(encryptedCert.getPublicKey(), encryptedPayload.encryptedMessage, encryptedPayload.signature)
+                            : certVerify.verifyHashedMessage(encryptedCert.getPublicKey(), aesUtil.decrypt(secretKeyHashMap.get(deviceName), encryptedPayload.encryptedMessage), encryptedPayload.signature);
+
+                    /*
+                    if(!isSignatureValid){
+                        publishInboundOutput.preventPublishDelivery(AckReasonCode.NOT_AUTHORIZED);
+                        return;
+                    }
+                    */
+
+                    // Get user properties and encrypted message itself
+                    byte[] encryptedMessage = encryptedPayload.encryptedMessage;
+
+                    // If algorithm is set to "kyber", unwrap the AES key, store it and set request response
+                    if(encryptedPayload.algorithmIdentifier.contains("kyber")){
+                        SecretKey secretKey = (SecretKey) kyberBroker.unwrap(
+                                privateKeyHashMap.get(deviceName).getPrivate(),
+                                encryptedMessage);
+                        secretKeyHashMap.put(deviceName, secretKey);
+
+                        String aesResponseTopic = publishInboundInput.getPublishPacket().getResponseTopic()
+                                .orElse(publishInboundInput.getPublishPacket().getTopic());
+                        publishInboundOutput.getPublishPacket().setPayload(
+                                ByteBuffer.wrap("SUCCESS".getBytes(StandardCharsets.UTF_8))
+                        );
+                        publishInboundOutput.getPublishPacket().setTopic(aesResponseTopic);
+                        publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("is_request_response", "true");
+                        publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("requires_encryption", "false");
+                        System.out.println("PACKET DELIVERED AND SAVED!");
+                        return;
+                    }
+
+                    // decrypt payload and create entity for publish
+                    byte[] plainMessage = aesUtil.decrypt(secretKeyHashMap.get(deviceName), encryptedMessage);
+                    String plainMsg = new String(plainMessage);
+                    MessageStruct messageStruct = MessageStruct.getFromBytes(plainMessage);
+                    MqttMsgPayload mqttMsgPayload = new MqttMsgPayload(
+                            messageStruct,
+                            encryptedPayload.signature,
+                            encryptedPayload.x509Certificate);
+
+                    // set publish packet with required user properties
+                    publishInboundOutput.getPublishPacket().setPayload(
+                            ByteBuffer.wrap(plainMessage)
                     );
-                    MqttMsgPayload mqttMsgPayload = MqttMsgPayload.getFromJsonString(plainMessage);
+                    publishInboundOutput.getPublishPacket().setTopic(publishPacket.getTopic());
+                    publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("is_request_response", "false");
+                    publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("requires_encryption", "true");
+                    System.out.println("AES PACKET DELIVERED AND SAVED!");
                     return;
                 }
             }
@@ -159,6 +212,12 @@ public class PublishExtensionMain implements ExtensionMain {
             String clientId = publishOutboundInput.getClientInformation().getClientId();
 
 
+            if(packet.getUserProperties().getAllForName("is_request_response").get(0).equals("true"))
+                return;
+            else if(packet.getUserProperties().getAllForName("requires_encryption").get(0).equals("true")
+                    && !secretKeyHashMap.containsKey(clientId))
+                publishOutboundOutput.preventPublishDelivery();
+
             // DATA IN BROKER'S PERSISTENCE WILL ALWAYS BE UNENCRYPTED BUT SIGNED
             // IN THIS CASE, IT WILL BE TRANSLATED FROM BUFFER TO OBJECT, ENCRYPTED,
             // AND SENT AS ENCRYPTED PAYLOAD IF KEY WAS FOUND
@@ -177,7 +236,7 @@ public class PublishExtensionMain implements ExtensionMain {
                 }
 
                 byte[] encryptedData = kyberBroker.encrypt(publicKey, payload.toJsonString());
-                EncryptedPayload encryptedPayload = new EncryptedPayload(encryptedData.toString(), "Kyber-1024");
+                EncryptedPayload encryptedPayload = new EncryptedPayload(encryptedData, "AES");
                 publishOutboundOutput.getPublishPacket().setPayload(
                         ByteBuffer.wrap(
                                 encryptedPayload.toJsonString().getBytes(StandardCharsets.UTF_8)

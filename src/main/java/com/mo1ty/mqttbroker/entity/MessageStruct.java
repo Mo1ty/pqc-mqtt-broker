@@ -46,7 +46,7 @@ public class MessageStruct implements Serializable {
 
     public static MessageStruct getFromBytes(byte[] message) throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.reader().readValue(message, MessageStruct.class);
+        return objectMapper.reader().readValue(new String(message, StandardCharsets.UTF_8), MessageStruct.class);
     }
 
 }

@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class EncryptedPayload {
 
-    public String encryptedMessage;
+    public byte[] encryptedMessage;
     public String algorithmIdentifier;
+    public byte[] signature;
+    public byte[] x509Certificate;
 
     public String toJsonString() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -17,7 +19,7 @@ public class EncryptedPayload {
         return objectMapper.reader().readValue(jsonString, EncryptedPayload.class);
     }
 
-    public EncryptedPayload(String encryptedMessage, String algorithmIdentifier) {
+    public EncryptedPayload(byte[] encryptedMessage, String algorithmIdentifier) {
         this.encryptedMessage = encryptedMessage;
         this.algorithmIdentifier = algorithmIdentifier;
     }
@@ -25,11 +27,11 @@ public class EncryptedPayload {
     public EncryptedPayload() {
     }
 
-    public String getEncryptedMessage() {
+    public byte[] getEncryptedMessage() {
         return encryptedMessage;
     }
 
-    public void setEncryptedMessage(String encryptedMessage) {
+    public void setEncryptedMessage(byte[] encryptedMessage) {
         this.encryptedMessage = encryptedMessage;
     }
 
