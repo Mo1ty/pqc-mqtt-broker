@@ -31,8 +31,4 @@ public class MqttBroker {
 
         CompletableFuture<Void> completableFuture = hiveMQ.start();
     }
-
-
-
-
 }

@@ -20,34 +20,26 @@ import com.hivemq.extension.sdk.api.services.Services;
 import com.hivemq.extension.sdk.api.services.intializer.ClientInitializer;
 import com.hivemq.extension.sdk.api.services.intializer.InitializerRegistry;
 import com.hivemq.util.Bytes;
-import com.mo1ty.mqttbroker.crypto.AesUtil;
-import com.mo1ty.mqttbroker.crypto.CertVerify;
-import com.mo1ty.mqttbroker.crypto.KyberBroker;
+import com.mo1ty.mqttbroker.crypto.*;
 import com.mo1ty.mqttbroker.entity.EncryptedPayload;
 import com.mo1ty.mqttbroker.entity.MessageStruct;
 import com.mo1ty.mqttbroker.entity.MqttMsgPayload;
-import org.bouncycastle.util.encoders.Base64;
 
 import javax.crypto.SecretKey;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
 import java.security.KeyPair;
-import java.security.PublicKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 
 public class PublishExtensionMain implements ExtensionMain {
 
     private HashMap<String, X509Certificate> certificateHashMap = new HashMap<>();
     private HashMap<String, KeyPair> privateKeyHashMap = new HashMap<>();
-    private HashMap<String, PublicKey> publicKeyHashMap = new HashMap<>();
-    private final CertVerify certVerify = new CertVerify();
+    private final CertVerify certVerify = new FalconVerify();
     private final KyberBroker kyberBroker = new KyberBroker();
     private final AesUtil aesUtil = new AesUtil();
 
@@ -101,12 +93,16 @@ public class PublishExtensionMain implements ExtensionMain {
                     InputStream in = new ByteArrayInputStream(msgPayload.x509Certificate);
                     X509Certificate cert = (X509Certificate) cf.generateCertificate(in);
 
-                    if(!certVerify.verifyHashedMessage(cert.getPublicKey(), msgPayload.messageStruct.toJsonStringAsBytes(), msgPayload.signature)) {
+                    if(!certVerify.verifyMessage(cert.getPublicKey(), msgPayload.messageStruct.toJsonStringAsBytes(), msgPayload.signature)) {
                         publishInboundOutput.preventPublishDelivery(AckReasonCode.UNSPECIFIED_ERROR);
                         return;
                     }
-                    else if(!msgPayload.messageStruct.plainMessage.contains("INIT_CONN_2"))
+                    else if(!msgPayload.messageStruct.plainMessage.contains("INIT_CONN_2")){
+                        publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("is_request_response", "false");
+                        publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("requires_encryption", "false");
                         return;
+                    }
+
 
                     // IF IT IS AN INIT_CONN MESSAGE, GENERATE KYBER KEYS,
                     // EDIT OUTPUT AND POST KYBER PUBKEY FOR PUBLISHER
@@ -140,15 +136,15 @@ public class PublishExtensionMain implements ExtensionMain {
                     X509Certificate encryptedCert = (X509Certificate) cf.generateCertificate(in);
 
                     boolean isSignatureValid = !encryptedPayload.algorithmIdentifier.contains("AES")
-                            ? certVerify.verifyHashedMessage(encryptedCert.getPublicKey(), encryptedPayload.encryptedMessage, encryptedPayload.signature)
-                            : certVerify.verifyHashedMessage(encryptedCert.getPublicKey(), aesUtil.decrypt(secretKeyHashMap.get(deviceName), encryptedPayload.encryptedMessage), encryptedPayload.signature);
+                            ? certVerify.verifyMessage(encryptedCert.getPublicKey(), encryptedPayload.encryptedMessage, encryptedPayload.signature)
+                            : certVerify.verifyMessage(encryptedCert.getPublicKey(), aesUtil.decrypt(secretKeyHashMap.get(deviceName), encryptedPayload.encryptedMessage), encryptedPayload.signature);
 
-                    /*
+
                     if(!isSignatureValid){
                         publishInboundOutput.preventPublishDelivery(AckReasonCode.NOT_AUTHORIZED);
                         return;
                     }
-                    */
+
 
                     // Get user properties and encrypted message itself
                     byte[] encryptedMessage = encryptedPayload.encryptedMessage;
@@ -174,7 +170,6 @@ public class PublishExtensionMain implements ExtensionMain {
 
                     // decrypt payload and create entity for publish
                     byte[] plainMessage = aesUtil.decrypt(secretKeyHashMap.get(deviceName), encryptedMessage);
-                    String plainMsg = new String(plainMessage);
                     MessageStruct messageStruct = MessageStruct.getFromBytes(plainMessage);
                     MqttMsgPayload mqttMsgPayload = new MqttMsgPayload(
                             messageStruct,
@@ -183,9 +178,9 @@ public class PublishExtensionMain implements ExtensionMain {
 
                     // set publish packet with required user properties
                     publishInboundOutput.getPublishPacket().setPayload(
-                            ByteBuffer.wrap(plainMessage)
+                            ByteBuffer.wrap(mqttMsgPayload.toJsonString())
                     );
-                    publishInboundOutput.getPublishPacket().setTopic(publishPacket.getTopic());
+                    // publishInboundOutput.getPublishPacket().setTopic(publishPacket.getTopic());
                     publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("is_request_response", "false");
                     publishInboundOutput.getPublishPacket().getUserProperties().addUserProperty("requires_encryption", "true");
                     System.out.println("AES PACKET DELIVERED AND SAVED!");
@@ -222,28 +217,27 @@ public class PublishExtensionMain implements ExtensionMain {
             // IN THIS CASE, IT WILL BE TRANSLATED FROM BUFFER TO OBJECT, ENCRYPTED,
             // AND SENT AS ENCRYPTED PAYLOAD IF KEY WAS FOUND
             MqttMsgPayload payload = isCertPayload(Bytes.getBytesFromReadOnlyBuffer(packet.getPayload()));
-            if(payload == null){
+            SecretKey secretKey = secretKeyHashMap.get(clientId);
+            if(payload != null && secretKey == null){
+                return;
+            }
+            else if(payload == null) {
                 publishOutboundOutput.preventPublishDelivery();
                 return;
             }
 
             try {
-                // IF PUBLIC KEY IS NOT FOUND, DATA WILL BE SENT UNENCRYPTED
-                // WITH SECURITY LEVEL 1 STANDARD
-                PublicKey publicKey = publicKeyHashMap.get(clientId);
-                if(publicKey == null){
-                    return;
-                }
-
-                byte[] encryptedData = kyberBroker.encrypt(publicKey, payload.toJsonString());
-                EncryptedPayload encryptedPayload = new EncryptedPayload(encryptedData, "AES");
-                publishOutboundOutput.getPublishPacket().setPayload(
-                        ByteBuffer.wrap(
-                                encryptedPayload.toJsonString().getBytes(StandardCharsets.UTF_8)
-                        )
+                byte[] communicationStruct = payload.messageStruct.toJsonStringAsBytes();
+                byte[] encryptedMessage = aesUtil.encrypt(secretKey, communicationStruct);
+                EncryptedPayload encryptedPayload = new EncryptedPayload(
+                        encryptedMessage,
+                        "AES",
+                        payload.signature,
+                        payload.x509Certificate
                 );
-            }
-            catch (Exception e){
+                ByteBuffer payloadBuffer = ByteBuffer.wrap(encryptedPayload.toJsonString().getBytes(StandardCharsets.UTF_8));
+                publishOutboundOutput.getPublishPacket().setPayload(payloadBuffer);
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
@@ -251,6 +245,7 @@ public class PublishExtensionMain implements ExtensionMain {
 
     private static MqttMsgPayload isCertPayload(byte[] payload){
         try{
+            String str = new String(payload);
             return MqttMsgPayload.getFromJsonString(payload);
         }
         catch (Exception e){

@@ -24,6 +24,13 @@ public class EncryptedPayload {
         this.algorithmIdentifier = algorithmIdentifier;
     }
 
+    public EncryptedPayload(byte[] encryptedMessage, String algorithmIdentifier, byte[] signature, byte[] x509Certificate) {
+        this.encryptedMessage = encryptedMessage;
+        this.algorithmIdentifier = algorithmIdentifier;
+        this.signature = signature;
+        this.x509Certificate = x509Certificate;
+    }
+
     public EncryptedPayload() {
     }
 

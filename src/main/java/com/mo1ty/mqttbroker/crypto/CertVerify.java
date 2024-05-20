@@ -1,49 +1,15 @@
 package com.mo1ty.mqttbroker.crypto;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
 import java.security.*;
 
-public class CertVerify {
+public interface CertVerify {
 
-    public CertVerify(){
-        if(Security.getProvider("BC") == null){
-            Security.addProvider(new BouncyCastleProvider());
-        }
-    }
+    byte[] signMessage(KeyPair keyPair, byte[] message) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException;
 
-    public byte[] signMessage(KeyPair keyPair, byte[] message) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
-        MessageDigest messageDigest = MessageDigest.getInstance("SHA3-512");
-        Signature falconSign = Signature.getInstance("Falcon-1024", "BC");
-        falconSign.initSign(keyPair.getPrivate());
-        falconSign.update(message);
-        byte[] signature = falconSign.sign();
-        return signature;
-    }
+    byte[] hashAndSignMessage(KeyPair keyPair, byte[] message) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException;
 
-    public byte[] hashAndSignMessage(KeyPair keyPair, byte[] message) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
-        MessageDigest messageDigest = MessageDigest.getInstance("SHA3-512");
-        Signature falconSign = Signature.getInstance("Falcon-1024", "BC");
-        falconSign.initSign(keyPair.getPrivate());
-        byte[] digestedMessage = messageDigest.digest(message);
-        falconSign.update(digestedMessage);
-        return falconSign.sign();
-    }
+    boolean verifyMessage(PublicKey publicKey, byte[] message, byte[] signature) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException;
 
-    public boolean verifyMessage(PublicKey publicKey, byte[] message, byte[] signature) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
-        Signature falconVerify = Signature.getInstance("Falcon-1024", "BC");
-        falconVerify.initVerify(publicKey);
-        falconVerify.update(message);
-        return falconVerify.verify(signature);
-    }
-
-    public boolean verifyHashedMessage(PublicKey publicKey, byte[] message, byte[] signature) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
-        MessageDigest messageDigest = MessageDigest.getInstance("SHA3-512");
-        Signature falconVerify = Signature.getInstance("Falcon-1024", "BC");
-        falconVerify.initVerify(publicKey);
-        byte[] digestedMessage = messageDigest.digest(message);
-        falconVerify.update(digestedMessage);
-        return falconVerify.verify(signature);
-    }
+    boolean verifyHashedMessage(PublicKey publicKey, byte[] message, byte[] signature) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException;
 
 }

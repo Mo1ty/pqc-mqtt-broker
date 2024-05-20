@@ -39,7 +39,6 @@ public class MessageStruct implements Serializable {
     }
 
     public byte[] toJsonStringAsBytes() throws Exception {
-        System.out.println("JACKSON STRING INITIATED!");
         ObjectMapper objectMapper = new ObjectMapper();
         return objectMapper.writer().writeValueAsString(this).getBytes(StandardCharsets.UTF_8);
     }
