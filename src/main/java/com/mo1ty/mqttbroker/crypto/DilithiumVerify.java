@@ -13,7 +13,7 @@ public class DilithiumVerify implements CertVerify {
     }
 
     public byte[] signMessage(KeyPair keyPair, byte[] message) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
-        Signature falconSign = Signature.getInstance("dilithium3", "BC");
+        Signature falconSign = Signature.getInstance("dilithium5", "BC");
         falconSign.initSign(keyPair.getPrivate());
         falconSign.update(message);
         byte[] signature = falconSign.sign();
@@ -22,7 +22,7 @@ public class DilithiumVerify implements CertVerify {
 
     public byte[] hashAndSignMessage(KeyPair keyPair, byte[] message) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
         MessageDigest messageDigest = MessageDigest.getInstance("SHA3-512");
-        Signature falconSign = Signature.getInstance("dilithium3", "BC");
+        Signature falconSign = Signature.getInstance("dilithium5", "BC");
         falconSign.initSign(keyPair.getPrivate());
         byte[] digestedMessage = messageDigest.digest(message);
         falconSign.update(digestedMessage);
@@ -30,7 +30,7 @@ public class DilithiumVerify implements CertVerify {
     }
 
     public boolean verifyMessage(PublicKey publicKey, byte[] message, byte[] signature) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
-        Signature falconVerify = Signature.getInstance("dilithium3", "BC");
+        Signature falconVerify = Signature.getInstance("dilithium5", "BC");
         falconVerify.initVerify(publicKey);
         falconVerify.update(message);
         return falconVerify.verify(signature);
@@ -38,7 +38,7 @@ public class DilithiumVerify implements CertVerify {
 
     public boolean verifyHashedMessage(PublicKey publicKey, byte[] message, byte[] signature) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
         MessageDigest messageDigest = MessageDigest.getInstance("SHA3-512");
-        Signature falconVerify = Signature.getInstance("dilithium3", "BC");
+        Signature falconVerify = Signature.getInstance("dilithium5", "BC");
         falconVerify.initVerify(publicKey);
         byte[] digestedMessage = messageDigest.digest(message);
         falconVerify.update(digestedMessage);
