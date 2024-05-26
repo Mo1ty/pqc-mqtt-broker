@@ -1,6 +1,6 @@
 # pqc-mqtt-broker
 
-Post-quantum MQTT broker - an MQTT broker application based on embedded HiveMQ Community Edition, using Bouncy Castle for communication.
+Post-quantum MQTT broker - an MQTT broker application based on embedded HiveMQ Community Edition, using Bouncy Castle for encryption.
 Requires clients for communication. For example, pqc-mqtt contains compatible publisher and subscriber implementations.
 
 ## How to launch
@@ -11,4 +11,4 @@ build.gradle file contains "mqttBroker" task that can be used to build a fatJar 
 ## Shortly about security
 This application is capable of communication on two levels of security: 
 1) First level utilizes message signatures. Broker will validate them before sending to the subscribers. Algorithms supported are Falcon and Dilithium. (only one is usable at time) 
-2) Second level requires handshake for clients to properly. Without the handshake, it is not possible to receive AES keys and therefore broker will block any packet before handshake is complete.
+2) Second level requires handshake for clients to connect properly. Without the handshake, it is not possible to receive AES keys and therefore broker will block any packet before handshake is complete.
